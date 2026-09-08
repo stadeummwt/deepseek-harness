@@ -1,5 +1,19 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  Search,
+  X,
+  ExternalLink,
+  Activity,
+  AlertTriangle,
+  ShieldCheck,
+  Zap,
+  Pause,
+  Play,
+  FileText,
+  Terminal,
+  History,
+  CheckCircle2,
+} from 'lucide-react';
 import {
   CANONICAL_PLUGINS,
   MODEL_CANDIDATES,
@@ -7,7 +21,16 @@ import {
   SECURITY_LOGS,
   PROFILES_METADATA,
 } from './data/canonicalData.ts';
-import { PluginMeta, ProfileType } from './types.ts';
+import {
+  PluginMeta,
+  ProfileType,
+  ProviderHealthReport,
+  ModelRouteEntry,
+  IncidentLogEntry,
+  LatencyDataPoint,
+} from './types.ts';
+import { pollProviderHealth } from './utils/providerProbe.ts';
+import { fetchProviderStatus, pollAllProvidersReal } from './services/providerHealthService.ts';
 import { PluginDetailModal } from './components/PluginDetailModal.tsx';
 import { RouterSimulatorModal } from './components/RouterSimulatorModal.tsx';
 import { DatasetTable } from './components/DatasetTable.tsx';
@@ -15,6 +38,10 @@ import { DataCleaningPipeline } from './components/DataCleaningPipeline.tsx';
 import { StatisticalAnalysisView } from './components/StatisticalAnalysisView.tsx';
 import { PredictiveModelView } from './components/PredictiveModelView.tsx';
 import { FileUploadModal } from './components/FileUploadModal.tsx';
+import { ExecutiveReportModal } from './components/ExecutiveReportModal.tsx';
+import { LatencySparkline } from './components/LatencySparkline.tsx';
+import { IncidentStreamDrawer } from './components/IncidentStreamDrawer.tsx';
+import { buildAuditReportData } from './services/reportGenerator.ts';
 import {
   generateCanonicalDataset,
   RawDataRecord,
@@ -40,6 +67,61 @@ export default function App() {
   const [uploadModalOpen, setUploadModalOpen] = useState<boolean>(false);
   const [liveTime, setLiveTime] = useState<string>('14:02:44.09');
   const [datasetName, setDatasetName] = useState<string>('DATABASE_CORE_1240');
+
+  // API Provider Health Monitor State
+  const [candidates, setCandidates] = useState<ModelRouteEntry[]>(() => MODEL_CANDIDATES);
+  const candidatesRef = useRef<ModelRouteEntry[]>(candidates);
+  useEffect(() => {
+    candidatesRef.current = candidates;
+  }, [candidates]);
+
+  const [pollCycle, setPollCycle] = useState<number>(1);
+  const [isProbing, setIsProbing] = useState<boolean>(false);
+  const [isPollingPaused, setIsPollingPaused] = useState<boolean>(false);
+  const [incidents, setIncidents] = useState<IncidentLogEntry[]>([]);
+  const [showIncidentsDrawer, setShowIncidentsDrawer] = useState<boolean>(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [providerHealth, setProviderHealth] = useState<ProviderHealthReport>(() =>
+    pollProviderHealth(MODEL_CANDIDATES, 1)
+  );
+  const latencyHistoryRef = useRef<LatencyDataPoint[]>([]);
+
+  // Keyboard Shortcuts (1-5 for tabs, Space for pause/resume, Esc to close modals)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        if (e.key === 'Escape') {
+          (document.activeElement as HTMLElement)?.blur();
+        }
+        return;
+      }
+
+      if (e.key === '1') {
+        setActiveTab('clean');
+      } else if (e.key === '2') {
+        setActiveTab('data');
+      } else if (e.key === '3') {
+        setActiveTab('stats');
+      } else if (e.key === '4') {
+        setActiveTab('model');
+      } else if (e.key === '5') {
+        setActiveTab('plugins');
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        setIsPollingPaused((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setSimulatorOpen(false);
+        setUploadModalOpen(false);
+        setSelectedPlugin(null);
+        setIsReportModalOpen(false);
+        setShowIncidentsDrawer(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Preprocessing Options & Data States
   const [preprocessOptions, setPreprocessOptions] = useState<PreprocessOptions>(DEFAULT_PREPROCESS_OPTIONS);
@@ -67,6 +149,54 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // API Provider Health Monitor: Performs actual HTTP fetch requests to candidate endpoints every 3.5 seconds
+  useEffect(() => {
+    let isMounted = true;
+    let inFlight = false;
+
+    const executeRealHealthCheck = async () => {
+      if (inFlight || isPollingPaused) return;
+      inFlight = true;
+      if (isMounted) setIsProbing(true);
+
+      try {
+        setPollCycle((prev) => {
+          const nextCycle = prev + 1;
+          pollAllProvidersReal(candidatesRef.current, nextCycle, latencyHistoryRef.current).then(
+            ({ updatedCandidates, report, newIncidents }) => {
+              if (isMounted) {
+                setProviderHealth(report);
+                setCandidates(updatedCandidates);
+                if (report.latencyHistory) {
+                  latencyHistoryRef.current = report.latencyHistory;
+                }
+                if (newIncidents && newIncidents.length > 0) {
+                  setIncidents((prevInc) => [...newIncidents, ...prevInc].slice(0, 30));
+                }
+              }
+            }
+          );
+          return nextCycle;
+        });
+      } catch (err) {
+        console.error('API Provider Health Check error:', err);
+      } finally {
+        inFlight = false;
+        if (isMounted) setIsProbing(false);
+      }
+    };
+
+    // Immediate initial execution on mount
+    executeRealHealthCheck();
+
+    const intervalId = setInterval(executeRealHealthCheck, 3500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [isPollingPaused]);
+
   // Execute cleaning pipeline and retrain model when rawData or options change
   const runPipeline = useCallback(() => {
     const { cleaned, report } = preprocessDataset(rawData, preprocessOptions);
@@ -88,6 +218,26 @@ export default function App() {
   const analysisReport: FullAnalysisReport = useMemo(() => {
     return performStatisticalAnalysis(cleanedData);
   }, [cleanedData]);
+
+  // Executive Audit Report Data
+  const reportData = useMemo(() => {
+    return buildAuditReportData(
+      rawData,
+      cleanedData,
+      cleaningReport?.stats || {
+        initialRecords: rawData.length,
+        missingValuesImputed: 0,
+        duplicatesRemoved: 0,
+        outliersFiltered: 0,
+        categoriesStandardized: 0,
+        finalRecords: cleanedData.length,
+      },
+      modelEngine.getEvaluation(),
+      providerHealth,
+      candidates,
+      incidents
+    );
+  }, [rawData, cleanedData, cleaningReport, modelEngine, providerHealth, candidates, incidents]);
 
   // Custom dataset loader from FileUploadModal
   const handleLoadCustomDataset = (newRecords: RawDataRecord[], filename: string) => {
@@ -160,24 +310,173 @@ export default function App() {
       <main id="main-content" className="grid grid-cols-12 gap-8 flex-grow">
         {/* Left Column (col-span-12 lg:col-span-4) */}
         <section id="metrics-status-section" className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-          {/* Primary Metrics Card */}
-          <div id="primary-metrics-card" className="bg-white/5 border border-white/10 p-6 rounded-2xl">
-            <h2 className="text-[11px] uppercase tracking-widest text-[#6366F1] font-bold mb-8">
-              Primary Metrics
-            </h2>
-            <div className="mb-6">
-              <span className="text-6xl font-black block leading-none">
-                {cleanedData.length > 0 ? `${(cleanedData.length / 1000).toFixed(1)}k` : '84.2k'}
-              </span>
-              <span className="text-[10px] uppercase tracking-widest text-white/40">Processed Entries</span>
+          {/* Primary Metrics Card - Real-Time API Provider Health Monitor */}
+          <div id="primary-metrics-card" className="bg-white/5 border border-white/10 p-6 rounded-2xl flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-6">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-[#6366F1] animate-pulse" />
+                  <h2 className="text-[11px] uppercase tracking-widest text-[#6366F1] font-bold">
+                    Primary Metrics
+                  </h2>
+                </div>
+                {/* Live Polling Status Pill & Pause Toggle */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsPollingPaused((p) => !p)}
+                    className="p-1 rounded bg-white/5 hover:bg-white/10 text-white/60 hover:text-white border border-white/10 transition-colors"
+                    title={isPollingPaused ? 'Resume live polling (Space)' : 'Pause live polling (Space)'}
+                  >
+                    {isPollingPaused ? (
+                      <Play className="w-3 h-3 text-amber-400" />
+                    ) : (
+                      <Pause className="w-3 h-3 text-white/60" />
+                    )}
+                  </button>
+                  <span
+                    id="provider-health-status-badge"
+                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono font-bold flex items-center gap-1.5 transition-colors ${
+                      providerHealth.status === 'OPERATIONAL'
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : providerHealth.status === 'DEGRADED'
+                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse'
+                        : 'bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        providerHealth.status === 'OPERATIONAL'
+                          ? 'bg-emerald-400'
+                          : providerHealth.status === 'DEGRADED'
+                          ? 'bg-amber-400'
+                          : 'bg-rose-400'
+                      }`}
+                    />
+                    <span>{isPollingPaused ? 'PAUSED' : providerHealth.status}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Metric 1: Processed Entries */}
+              <div className="mb-5">
+                <span className="text-6xl font-black block leading-none">
+                  {cleanedData.length > 0 ? `${(cleanedData.length / 1000).toFixed(1)}k` : '84.2k'}
+                </span>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-[10px] uppercase tracking-widest text-white/40">Processed Entries</span>
+                  <span className="text-[10px] text-white/40 font-mono">{datasetName}</span>
+                </div>
+              </div>
+
+              {/* Metric 2: Live Latent Response from API Health Monitor */}
+              <div className="mb-4">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-6xl font-black block leading-none text-[#6366F1]">
+                    {providerHealth.averageLatencyMs ? `${(providerHealth.averageLatencyMs / 1000).toFixed(3)}s` : '0.042s'}
+                  </span>
+                  <span className="text-xs text-white/40 font-mono">
+                    ({providerHealth.averageLatencyMs}ms)
+                  </span>
+                </div>
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-[10px] uppercase tracking-widest text-white/40">Latent Response (Real-Time)</span>
+                  <span className="text-[10px] text-emerald-400/80 font-mono font-bold">
+                    Min {providerHealth.minLatencyMs}ms • Max {providerHealth.maxLatencyMs}ms
+                  </span>
+                </div>
+              </div>
+
+              {/* Rolling Latency Sparkline Component */}
+              <div className="mb-5">
+                <LatencySparkline
+                  history={providerHealth.latencyHistory || []}
+                  currentLatency={providerHealth.averageLatencyMs}
+                />
+              </div>
+
+              {/* Metric 3: Live Active Provider Cluster Strip */}
+              <div className="pt-4 border-t border-white/5 flex flex-col gap-2">
+                <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-white/40 font-mono">
+                  <div className="flex items-center gap-2">
+                    <span>API Cluster Endpoints</span>
+                    {incidents.length > 0 && (
+                      <button
+                        onClick={() => setShowIncidentsDrawer(true)}
+                        className="px-1.5 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 flex items-center gap-1 transition-colors cursor-pointer"
+                        title="View Live Incident Stream"
+                      >
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        <span>{incidents.length} Events</span>
+                      </button>
+                    )}
+                  </div>
+                  <span className={providerHealth.healthyCount === providerHealth.totalCount ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                    {providerHealth.healthyCount} / {providerHealth.totalCount} Healthy
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-5 gap-1.5">
+                  {candidates.map((cand) => {
+                    const isHealthy = cand.circuitState === 'HEALTHY';
+                    const latency = cand.authProbe?.measuredLatencyMs;
+                    return (
+                      <div
+                        key={cand.id}
+                        className={`p-1.5 rounded-lg border flex flex-col items-center justify-center text-center transition-all ${
+                          isHealthy
+                            ? 'bg-white/[0.03] border-white/10 hover:border-emerald-500/40'
+                            : 'bg-rose-500/10 border-rose-500/40 animate-pulse'
+                        }`}
+                        title={`${cand.name} (${cand.provider}): ${cand.circuitState} - HTTP ${cand.authProbe?.lastStatusCode || 200}${
+                          cand.endpoint ? `\nTarget: ${cand.endpoint}` : ''
+                        }${cand.authProbe?.failureReason ? `\nReason: ${cand.authProbe.failureReason}` : ''}`}
+                      >
+                        <span className="text-[9px] font-mono text-white/70 truncate w-full">
+                          {cand.name.replace('deepseek-', 'ds-').replace('local-', 'loc-')}
+                        </span>
+                        <span
+                          className={`text-[9px] font-mono font-bold mt-0.5 ${
+                            isHealthy ? 'text-emerald-400' : 'text-rose-400'
+                          }`}
+                        >
+                          {cand.authProbe?.lastStatusCode || 200}
+                        </span>
+                        <span className="text-[8px] font-mono text-white/40 mt-0.5">
+                          {latency ? `${latency}ms` : '—'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {providerHealth.activeCircuitBreakers > 0 && (
+                  <div className="mt-1 p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] font-sans flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span className="truncate">{providerHealth.activeCircuitBreakers} Circuit Breaker Tripped</span>
+                    </div>
+                    <button
+                      onClick={() => setSimulatorOpen(true)}
+                      className="text-[10px] uppercase font-bold text-white underline hover:text-rose-200 cursor-pointer shrink-0"
+                    >
+                      Remediate
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="mb-2">
-              <span className="text-6xl font-black block leading-none text-[#6366F1]">
-                {analysisReport?.numericStatistics?.latency
-                  ? `${(analysisReport.numericStatistics.latency.mean / 1000).toFixed(2)}s`
-                  : '0.04s'}
+
+            {/* Live Polling Telemetry Footer */}
+            <div className="mt-4 pt-3 border-t border-white/10 flex justify-between items-center text-[9px] uppercase tracking-wider text-white/40 font-mono">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isProbing ? 'bg-emerald-400 animate-ping' : 'bg-[#6366F1]'
+                  }`}
+                />
+                <span>{isProbing ? 'Probing Endpoints...' : `Poll #${providerHealth.pollCycleCount} Active`}</span>
               </span>
-              <span className="text-[10px] uppercase tracking-widest text-white/40">Latent Response</span>
+              <span>Synced {providerHealth.lastPollTimestamp}</span>
             </div>
           </div>
 
@@ -210,6 +509,23 @@ export default function App() {
                 className="px-4 py-2 bg-white/20 text-black text-xs font-black uppercase tracking-widest rounded-xl hover:bg-white/30 transition-colors cursor-pointer"
               >
                 Predictor
+              </button>
+              <button
+                id="btn-quick-sentinel"
+                onClick={() => setSimulatorOpen(true)}
+                className="px-4 py-2 bg-black text-emerald-400 border border-emerald-400/30 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-neutral-900 transition-colors cursor-pointer flex items-center gap-1"
+                title="Launch Active Provider Probe & Zero-Leak Sentinel Workbench"
+              >
+                <span>Sentinel Workbench</span>
+              </button>
+              <button
+                id="btn-quick-audit-report"
+                onClick={() => setIsReportModalOpen(true)}
+                className="px-4 py-2 bg-black text-amber-300 border border-amber-300/30 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-neutral-900 transition-colors cursor-pointer flex items-center gap-1.5"
+                title="Generate & Export Full Executive Audit Report (JSON & Markdown)"
+              >
+                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                <span>Audit Report</span>
               </button>
             </div>
 
@@ -495,11 +811,32 @@ export default function App() {
         isOpen={simulatorOpen}
         onClose={() => setSimulatorOpen(false)}
         currentProfile={activeProfile}
+        candidates={candidates}
+        onUpdateCandidates={(updated) => {
+          setCandidates(updated);
+          setProviderHealth(pollProviderHealth(updated, pollCycle));
+        }}
       />
       <FileUploadModal
         isOpen={uploadModalOpen}
         onClose={() => setUploadModalOpen(false)}
         onLoadDataset={handleLoadCustomDataset}
+      />
+      <ExecutiveReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reportData={reportData}
+        liveHealthReport={providerHealth}
+        liveCandidates={candidates}
+        liveIncidents={incidents}
+        isProbing={isProbing}
+        isPollingPaused={isPollingPaused}
+        onTogglePause={() => setIsPollingPaused((p) => !p)}
+      />
+      <IncidentStreamDrawer
+        isOpen={showIncidentsDrawer}
+        onClose={() => setShowIncidentsDrawer(false)}
+        incidents={incidents}
       />
     </div>
   );

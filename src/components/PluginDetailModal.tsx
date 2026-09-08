@@ -10,8 +10,10 @@ import {
   ExternalLink,
   Terminal,
   GitBranch,
+  BookOpen,
 } from 'lucide-react';
 import { PluginMeta } from '../types.ts';
+import { SyncGuideModal } from './SyncGuideModal.tsx';
 
 interface PluginDetailModalProps {
   plugin: PluginMeta | null;
@@ -24,6 +26,7 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
   const [showConfigPreview, setShowConfigPreview] = useState<boolean>(true);
   const [previewTab, setPreviewTab] = useState<'json' | 'yaml' | 'cli'>('json');
   const [showToast, setShowToast] = useState<boolean>(false);
+  const [showSyncGuide, setShowSyncGuide] = useState<boolean>(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -233,23 +236,35 @@ plugins:
           {/* Upstream DeepSeek Harness Sync Banner */}
           <div
             id="upstream-harness-banner"
-            className="flex items-center justify-between px-3.5 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-xs"
+            className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-xs"
           >
             <div className="flex items-center gap-2">
               <GitBranch className="w-4 h-4 text-[#6366F1]" />
               <span className="text-white/60">Target Runtime:</span>
               <span className="text-white font-bold font-mono">@deepseek-ai/dsh (Cordis v4)</span>
             </div>
-            <a
-              id="upstream-repo-link"
-              href="https://github.com/deepseek-ai/deepseek-harness.git"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-[11px] text-[#A5B4FC] hover:text-white transition-colors underline-offset-2 hover:underline"
-            >
-              <span>deepseek-ai/deepseek-harness</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            <div className="flex items-center gap-3">
+              <button
+                id="sync-guide-link"
+                data-testid="sync-guide-link"
+                onClick={() => setShowSyncGuide(true)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 text-[11px] font-bold transition-all cursor-pointer shadow-sm"
+                title="Open DeepSeek Harness Sync Guide"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Sync Guide</span>
+              </button>
+              <a
+                id="upstream-repo-link"
+                href="https://github.com/deepseek-ai/deepseek-harness.git"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-[11px] text-[#A5B4FC] hover:text-white transition-colors underline-offset-2 hover:underline"
+              >
+                <span>deepseek-ai/deepseek-harness</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
           </div>
 
           <div className="p-4 bg-white/[0.03] border border-white/5 rounded-xl">
@@ -350,7 +365,15 @@ plugins:
               Konfigurasi ini disinkronkan secara presisi dengan runtime spesifikasi{' '}
               <strong className="text-white font-medium">deepseek-ai/deepseek-harness</strong>. Dapat langsung dimuat
               oleh CLI <code className="text-[#A5B4FC]">dsh</code> atau di-patch ke dalam berkas{' '}
-              <code className="text-[#A5B4FC]">cordis.patch.yml</code>.
+              <code className="text-[#A5B4FC]">cordis.patch.yml</code>.{' '}
+              <button
+                id="sync-guide-inline-link"
+                onClick={() => setShowSyncGuide(true)}
+                className="text-emerald-400 hover:text-emerald-300 underline font-bold cursor-pointer inline-flex items-center gap-1"
+              >
+                <span>Lihat Panduan Sinkronisasi (Sync Guide)</span>
+                <BookOpen className="w-3 h-3 inline" />
+              </button>
             </p>
 
             {/* Optional JSON / YAML / CLI Preview */}
@@ -374,10 +397,19 @@ plugins:
 
         {/* Footer with Download Configuration Button */}
         <div className="p-4 bg-white/[0.02] border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="text-[10px] uppercase tracking-widest text-white/40 flex items-center gap-2">
+          <div className="text-[10px] uppercase tracking-widest text-white/40 flex flex-wrap items-center gap-2">
             <span>deepseek-ai/deepseek-harness</span>
             <span className="w-1 h-1 rounded-full bg-white/20" />
             <span className="text-[#6366F1] font-bold">100% Deterministic</span>
+            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <button
+              id="footer-sync-guide-btn"
+              onClick={() => setShowSyncGuide(true)}
+              className="text-emerald-400 hover:text-emerald-300 underline flex items-center gap-1 cursor-pointer font-bold lowercase first-letter:uppercase"
+            >
+              <BookOpen className="w-3 h-3" />
+              <span>Sync Guide</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
@@ -402,6 +434,13 @@ plugins:
           </div>
         </div>
       </div>
+
+      {/* DeepSeek Harness Runtime Sync Guide Modal */}
+      <SyncGuideModal
+        plugin={plugin}
+        isOpen={showSyncGuide}
+        onClose={() => setShowSyncGuide(false)}
+      />
     </div>
   );
 }

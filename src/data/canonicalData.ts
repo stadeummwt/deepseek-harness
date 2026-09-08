@@ -128,6 +128,15 @@ export const MODEL_CANDIDATES: ModelRouteEntry[] = [
     circuitState: 'HEALTHY',
     score: 0.894,
     failureDomain: 'global-edge',
+    endpoint: 'https://api.deepseek.com/models',
+    authProbe: {
+      lastStatusCode: 200,
+      lastProbeTimestamp: '04:20:11',
+      authHeaderAttached: true,
+      tokenExpirySecondsRemaining: 3420,
+      refreshCount: 0,
+      autoRecovering: false,
+    },
   },
   {
     id: '#MOD-02',
@@ -138,6 +147,15 @@ export const MODEL_CANDIDATES: ModelRouteEntry[] = [
     circuitState: 'HEALTHY',
     score: 0.941,
     failureDomain: 'global-edge',
+    endpoint: 'https://api.deepseek.com/v1/models',
+    authProbe: {
+      lastStatusCode: 200,
+      lastProbeTimestamp: '04:20:12',
+      authHeaderAttached: true,
+      tokenExpirySecondsRemaining: 3510,
+      refreshCount: 0,
+      autoRecovering: false,
+    },
   },
   {
     id: '#MOD-03',
@@ -148,6 +166,15 @@ export const MODEL_CANDIDATES: ModelRouteEntry[] = [
     circuitState: 'HEALTHY',
     score: 0.725,
     failureDomain: 'local-host',
+    endpoint: 'http://localhost:11434/api/tags',
+    authProbe: {
+      lastStatusCode: 200,
+      lastProbeTimestamp: '04:20:13',
+      authHeaderAttached: false,
+      tokenExpirySecondsRemaining: 86400,
+      refreshCount: 0,
+      autoRecovering: false,
+    },
   },
   {
     id: '#MOD-04',
@@ -158,6 +185,15 @@ export const MODEL_CANDIDATES: ModelRouteEntry[] = [
     circuitState: 'HEALTHY',
     score: 0.960,
     failureDomain: 'gcp-us-central1',
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+    authProbe: {
+      lastStatusCode: 200,
+      lastProbeTimestamp: '04:20:14',
+      authHeaderAttached: true,
+      tokenExpirySecondsRemaining: 2890,
+      refreshCount: 0,
+      autoRecovering: false,
+    },
   },
   {
     id: '#MOD-05',
@@ -168,6 +204,15 @@ export const MODEL_CANDIDATES: ModelRouteEntry[] = [
     circuitState: 'HEALTHY',
     score: 0.975,
     failureDomain: 'aws-us-east1',
+    endpoint: 'https://api.anthropic.com/v1/models',
+    authProbe: {
+      lastStatusCode: 200,
+      lastProbeTimestamp: '04:20:15',
+      authHeaderAttached: true,
+      tokenExpirySecondsRemaining: 1980,
+      refreshCount: 0,
+      autoRecovering: false,
+    },
   },
 ];
 

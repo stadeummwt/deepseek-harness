@@ -1,4 +1,5 @@
 import { CleanedDataRecord } from '../data/rawDataset.ts';
+import { BatchPredictionSummary, BatchPredictionItem } from '../types.ts';
 
 export interface FeatureImportance {
   feature: string;
@@ -575,3 +576,85 @@ export class PredictiveModelEngine {
 }
 
 export const defaultPredictiveModel = new PredictiveModelEngine();
+
+/**
+ * Runs batch prediction across all records in the provided dataset using the trained Decision Forest model.
+ * Computes concordance rate, risk class distribution, and individual prediction metrics.
+ */
+export function runBatchInference(
+  model: PredictiveModelEngine,
+  dataset: CleanedDataRecord[]
+): BatchPredictionSummary {
+  if (!dataset || dataset.length === 0) {
+    return {
+      totalProcessed: 0,
+      stableCount: 0,
+      unstableCount: 0,
+      concordanceRate: 100,
+      averageConfidence: 0,
+      riskBreakdown: { LOW: 0, MEDIUM: 0, HIGH: 0 },
+      predictions: [],
+      executedAt: new Date().toLocaleTimeString(),
+    };
+  }
+
+  let stableCount = 0;
+  let unstableCount = 0;
+  let matches = 0;
+  let totalConf = 0;
+  const riskBreakdown = { LOW: 0, MEDIUM: 0, HIGH: 0 };
+
+  const predictions: BatchPredictionItem[] = dataset.map((rec) => {
+    const res = model.predict(rec);
+    const predictedStatus = res.predictedClass === 'STABLE' ? 'STABLE' : 'UNSTABLE';
+    const actualStatus = rec.execution === 'STABLE' ? 'STABLE' : 'UNSTABLE';
+
+    if (predictedStatus === 'STABLE') {
+      stableCount++;
+    } else {
+      unstableCount++;
+    }
+
+    if (predictedStatus === actualStatus) {
+      matches++;
+    }
+
+    totalConf += res.confidence;
+
+    let riskClass: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+    if (rec.risk_score > 0.65 || res.probabilities.REJECTED > 0.4) {
+      riskClass = 'HIGH';
+      riskBreakdown.HIGH++;
+    } else if (rec.risk_score > 0.35 || res.probabilities.PENDING > 0.3) {
+      riskClass = 'MEDIUM';
+      riskBreakdown.MEDIUM++;
+    } else {
+      riskBreakdown.LOW++;
+    }
+
+    const keyFactor = res.featureContributions[0]?.summary || `Risk score: ${rec.risk_score}`;
+
+    return {
+      id: rec.id,
+      cluster: rec.category,
+      workload: rec.variable,
+      actualStatus,
+      predictedStatus,
+      confidence: res.confidence,
+      riskScore: rec.risk_score,
+      riskClass,
+      keyFactor,
+    };
+  });
+
+  return {
+    totalProcessed: dataset.length,
+    stableCount,
+    unstableCount,
+    concordanceRate: Math.round((matches / dataset.length) * 1000) / 10,
+    averageConfidence: Math.round((totalConf / dataset.length) * 1000) / 10,
+    riskBreakdown,
+    predictions,
+    executedAt: new Date().toLocaleTimeString(),
+  };
+}

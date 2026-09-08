@@ -9,11 +9,22 @@ import {
   Cell,
 } from 'recharts';
 import {
+  Play,
+  Download,
+  CheckCircle2,
+  AlertTriangle,
+  Layers,
+  Filter,
+  Sparkles,
+} from 'lucide-react';
+import {
   ModelEvaluation,
   PredictiveModelEngine,
   PredictionResult,
+  runBatchInference,
 } from '../utils/predictiveModel.ts';
 import { CleanedDataRecord } from '../data/rawDataset.ts';
+import { BatchPredictionSummary } from '../types.ts';
 
 interface PredictiveModelViewProps {
   modelEngine: PredictiveModelEngine;
@@ -35,6 +46,42 @@ export function PredictiveModelView({
   const [sandboxTokens, setSandboxTokens] = useState<number>(1500);
   const [sandboxRisk, setSandboxRisk] = useState<number>(0.15);
   const [sandboxInvocations, setSandboxInvocations] = useState<number>(14000);
+
+  // Batch prediction state
+  const [batchResult, setBatchResult] = useState<BatchPredictionSummary | null>(null);
+  const [isBatchRunning, setIsBatchRunning] = useState<boolean>(false);
+  const [batchFilter, setBatchFilter] = useState<'ALL' | 'MISMATCH' | 'HIGH_RISK'>('ALL');
+
+  const handleRunBatchInference = () => {
+    setIsBatchRunning(true);
+    setTimeout(() => {
+      const summary = runBatchInference(modelEngine, cleanedData);
+      setBatchResult(summary);
+      setIsBatchRunning(false);
+    }, 150);
+  };
+
+  const exportBatchCsv = () => {
+    if (!batchResult) return;
+    const headers = 'ID,Cluster,Workload,ActualStatus,PredictedStatus,Confidence,RiskScore,RiskClass,KeyFactor\n';
+    const rows = batchResult.predictions
+      .map(
+        (p) =>
+          `"${p.id}","${p.cluster}","${p.workload}","${p.actualStatus}","${p.predictedStatus}",${(
+            p.confidence * 100
+          ).toFixed(1)}%,${p.riskScore},"${p.riskClass}","${p.keyFactor.replace(/"/g, '""')}"`
+      )
+      .join('\n');
+    const blob = new Blob([headers + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dsh-batch-predictions-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // Real-time prediction
   const prediction: PredictionResult = useMemo(() => {
@@ -499,6 +546,243 @@ export function PredictiveModelView({
           </div>
         </div>
       </div>
+
+      {/* Batch Prediction & Cluster Risk Inference Engine */}
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5 mb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <Layers className="w-5 h-5 text-[#6366F1]" />
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">
+                Batch Inference Engine
+              </h3>
+              <span className="text-[10px] bg-[#6366F1]/20 text-[#6366F1] px-2 py-0.5 rounded font-mono font-bold">
+                {cleanedData.length} Cleaned Records
+              </span>
+            </div>
+            <p className="text-xs text-white/50 mt-1">
+              Runs the trained ensemble decision forest across the entire active dataset to evaluate cluster-wide stability.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {batchResult && (
+              <button
+                onClick={exportBatchCsv}
+                className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-xs font-mono transition-colors"
+                title="Export batch prediction results to CSV"
+              >
+                <Download className="w-4 h-4 text-[#6366F1]" />
+                <span>Export CSV</span>
+              </button>
+            )}
+            <button
+              onClick={handleRunBatchInference}
+              disabled={isBatchRunning}
+              className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] hover:bg-[#5558E6] text-white rounded-lg text-xs font-bold font-mono transition-colors disabled:opacity-50 shadow-lg shadow-[#6366F1]/20"
+            >
+              <Play className={`w-4 h-4 ${isBatchRunning ? 'animate-spin' : ''}`} />
+              <span>{isBatchRunning ? 'Inferring Cluster...' : 'Run Batch Inference'}</span>
+            </button>
+          </div>
+        </div>
+
+        {batchResult ? (
+          <div className="space-y-6">
+            {/* Batch Scorecard */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-black/30 border border-white/10 p-4 rounded-xl">
+                <span className="text-[9px] uppercase tracking-wider text-white/40 block">
+                  Concordance Rate
+                </span>
+                <span className="text-2xl font-bold text-emerald-400 font-mono mt-1 block">
+                  {batchResult.concordanceRate}%
+                </span>
+                <span className="text-[10px] text-white/40">
+                  Actual vs Predicted match
+                </span>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 p-4 rounded-xl">
+                <span className="text-[9px] uppercase tracking-wider text-white/40 block">
+                  Avg Model Confidence
+                </span>
+                <span className="text-2xl font-bold text-white font-mono mt-1 block">
+                  {batchResult.averageConfidence}%
+                </span>
+                <span className="text-[10px] text-white/40">
+                  Mean probability mass
+                </span>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 p-4 rounded-xl">
+                <span className="text-[9px] uppercase tracking-wider text-white/40 block">
+                  Predicted Stable
+                </span>
+                <span className="text-2xl font-bold text-emerald-400 font-mono mt-1 block">
+                  {batchResult.stableCount}
+                  <span className="text-xs text-white/40 font-normal ml-1">
+                    / {batchResult.totalProcessed}
+                  </span>
+                </span>
+                <span className="text-[10px] text-white/40">
+                  {((batchResult.stableCount / batchResult.totalProcessed) * 100).toFixed(0)}% of cluster
+                </span>
+              </div>
+
+              <div className="bg-black/30 border border-white/10 p-4 rounded-xl">
+                <span className="text-[9px] uppercase tracking-wider text-white/40 block">
+                  Risk Breakdown
+                </span>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono font-bold">
+                    {batchResult.riskBreakdown.LOW} Low
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono font-bold">
+                    {batchResult.riskBreakdown.MEDIUM} Med
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-mono font-bold">
+                    {batchResult.riskBreakdown.HIGH} High
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-white/60">
+                <Filter className="w-3.5 h-3.5" />
+                <span>Filter:</span>
+                <button
+                  onClick={() => setBatchFilter('ALL')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
+                    batchFilter === 'ALL'
+                      ? 'bg-[#6366F1] text-white font-bold'
+                      : 'bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  All ({batchResult.predictions.length})
+                </button>
+                <button
+                  onClick={() => setBatchFilter('MISMATCH')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
+                    batchFilter === 'MISMATCH'
+                      ? 'bg-[#6366F1] text-white font-bold'
+                      : 'bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  Mismatches ({batchResult.predictions.filter((p) => p.actualStatus !== p.predictedStatus).length})
+                </button>
+                <button
+                  onClick={() => setBatchFilter('HIGH_RISK')}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
+                    batchFilter === 'HIGH_RISK'
+                      ? 'bg-[#6366F1] text-white font-bold'
+                      : 'bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  High Risk Only ({batchResult.riskBreakdown.HIGH})
+                </button>
+              </div>
+
+              <span className="text-[11px] text-white/40 font-mono">
+                Executed at {batchResult.executedAt}
+              </span>
+            </div>
+
+            {/* Batch Table */}
+            <div className="border border-white/10 rounded-xl overflow-hidden max-h-[340px] overflow-y-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead className="bg-white/5 border-b border-white/10 text-white/40 text-[10px] uppercase sticky top-0 backdrop-blur-md">
+                  <tr>
+                    <th className="p-2.5">Workload</th>
+                    <th className="p-2.5">Category</th>
+                    <th className="p-2.5">Actual</th>
+                    <th className="p-2.5">Predicted</th>
+                    <th className="p-2.5">Confidence</th>
+                    <th className="p-2.5">Risk Tier</th>
+                    <th className="p-2.5">Dominant Signal</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {batchResult.predictions
+                    .filter((p) => {
+                      if (batchFilter === 'MISMATCH') return p.actualStatus !== p.predictedStatus;
+                      if (batchFilter === 'HIGH_RISK') return p.riskClass === 'HIGH';
+                      return true;
+                    })
+                    .map((item) => {
+                      const isMatch = item.actualStatus === item.predictedStatus;
+                      return (
+                        <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="p-2.5 font-bold text-white flex items-center gap-1.5">
+                            {isMatch ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            ) : (
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            )}
+                            <span className="truncate max-w-[140px]">{item.workload}</span>
+                          </td>
+                          <td className="p-2.5 text-white/60 text-[11px]">{item.cluster}</td>
+                          <td className="p-2.5">
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                                item.actualStatus === 'STABLE'
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : 'bg-rose-500/20 text-rose-300'
+                              }`}
+                            >
+                              {item.actualStatus}
+                            </span>
+                          </td>
+                          <td className="p-2.5">
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                                item.predictedStatus === 'STABLE'
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : 'bg-rose-500/20 text-rose-300'
+                              }`}
+                            >
+                              {item.predictedStatus}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-white/80 font-bold">
+                            {(item.confidence * 100).toFixed(1)}%
+                          </td>
+                          <td className="p-2.5">
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                                item.riskClass === 'LOW'
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : item.riskClass === 'MEDIUM'
+                                  ? 'bg-amber-500/20 text-amber-300'
+                                  : 'bg-rose-500/20 text-rose-300'
+                              }`}
+                            >
+                              {item.riskClass} ({item.riskScore})
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-white/50 text-[10px] truncate max-w-[220px]" title={item.keyFactor}>
+                            {item.keyFactor}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="py-8 text-center bg-black/20 border border-white/5 rounded-xl">
+            <Sparkles className="w-8 h-8 text-[#6366F1] mx-auto mb-2 opacity-60" />
+            <p className="text-xs text-white/70 font-bold">Batch Inference Not Yet Executed</p>
+            <p className="text-[11px] text-white/40 mt-1 max-w-md mx-auto">
+              Click &ldquo;Run Batch Inference&rdquo; to evaluate all {cleanedData.length} records simultaneously through the trained decision forest.
+            </p>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
