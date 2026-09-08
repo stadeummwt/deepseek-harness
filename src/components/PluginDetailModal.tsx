@@ -1,5 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, Check, Copy, Code, FileText, CheckCircle2, X } from 'lucide-react';
+import {
+  Download,
+  Check,
+  Copy,
+  Code,
+  FileText,
+  CheckCircle2,
+  X,
+  ExternalLink,
+  Terminal,
+  GitBranch,
+} from 'lucide-react';
 import { PluginMeta } from '../types.ts';
 
 interface PluginDetailModalProps {
@@ -10,7 +21,8 @@ interface PluginDetailModalProps {
 export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
   const [downloaded, setDownloaded] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
-  const [showConfigPreview, setShowConfigPreview] = useState<boolean>(false);
+  const [showConfigPreview, setShowConfigPreview] = useState<boolean>(true);
+  const [previewTab, setPreviewTab] = useState<'json' | 'yaml' | 'cli'>('json');
   const [showToast, setShowToast] = useState<boolean>(false);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -22,20 +34,44 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
 
   if (!plugin) return null;
 
-  // Construct comprehensive DSH environment configuration object
+  const sanitizedName = plugin.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const dshPackageId = `@dsh/plugin-${plugin.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
+
+  // DeepSeek Harness (deepseek-ai/deepseek-harness) compatible runtime configuration
   const pluginConfigObject = {
-    $schema: 'https://cordis.dsh.internal/schemas/v4/plugin-config.json',
-    dshVersion: '4.0.0-rc.9',
-    targetEnvironment: 'DSH_CORP_SOVEREIGN',
-    exportedAt: new Date().toISOString(),
+    $schema: 'https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/main/schemas/runtime-plugin-v4.json',
+    upstream: {
+      repository: 'https://github.com/deepseek-ai/deepseek-harness.git',
+      package: '@deepseek-ai/dsh',
+      framework: 'DeepSeek Harness (Cordis Plugin Architecture)',
+      targetBranch: 'main',
+      specVersion: '4.0.0-rc.9',
+      compatRange: '>=4.0.0',
+    },
     plugin: {
       id: plugin.id,
-      name: plugin.name,
-      version: plugin.version,
+      name: dshPackageId,
+      displayName: plugin.name,
+      version: plugin.version || '4.0.0',
       category: plugin.category,
       executionClass: plugin.executionClass,
       executionStatus: plugin.executionStatus,
       description: plugin.description,
+    },
+    runtime: {
+      targetEnvironment: 'DSH_CORP_SOVEREIGN',
+      nodeBinding: 'KUALA_LUMPUR_04',
+      accessLevel: 'ADMINISTRATOR_LEVEL_0',
+      protocol: 'ALPHA_SOVEREIGN',
+      kernel: 'cordis-v4',
+      container: 'Cordis v4 Sovereign Service Container',
+      mode: 'ptc',
+      permissions: {
+        level: 'workspace-write',
+        enforceDeterminism: true,
+        zeroLeakSanitization: true,
+        maxDelegationDepth: 2,
+      },
     },
     settings: {
       variable: plugin.variable,
@@ -51,15 +87,44 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
         allowedErrorRate: plugin.metrics.errorRate,
       },
     },
-    runtimeContext: {
-      node: 'KUALA_LUMPUR_04',
-      accessLevel: 'ADMINISTRATOR_LEVEL_0',
-      protocol: 'ALPHA_SOVEREIGN',
-      container: 'Cordis v4 Sovereign Service Container',
+    sync: {
+      upstreamRepo: 'https://github.com/deepseek-ai/deepseek-harness.git',
+      patchFilePath: 'cordis.patch.yml',
+      patchDirective: `plugins:\n  - name: "${dshPackageId}"\n    config: ./plugins/${sanitizedName}-config.json`,
+      cliCommand: `npx @deepseek-ai/dsh --plugin ./plugins/${sanitizedName}-config.json`,
     },
+    exportedAt: new Date().toISOString(),
   };
 
   const configJsonString = JSON.stringify(pluginConfigObject, null, 2);
+
+  const cordisPatchYamlString = `# cordis.patch.yml - deepseek-ai/deepseek-harness runtime patch
+# Upstream Specification: https://github.com/deepseek-ai/deepseek-harness.git
+# Plugin: ${plugin.name} (${plugin.id})
+plugins:
+  - name: "${dshPackageId}"
+    version: "${plugin.version || '4.0.0'}"
+    enabled: true
+    executionClass: "${plugin.executionClass}"
+    settings:
+      variable: "${plugin.variable}"
+      policyGating: "${plugin.policyGating}"
+      enforceDeterminism: true
+      zeroLeakSanitization: true
+      maxDelegationDepth: 2
+    metrics:
+      targetInvocations: ${plugin.metrics.invocations}
+      latencyThresholdMs: ${plugin.metrics.latencyMs}
+      errorRateAllowance: ${plugin.metrics.errorRate}`;
+
+  const cliCommandString = `npx @deepseek-ai/dsh --plugin ./plugins/${sanitizedName}-config.json --mode ptc`;
+
+  const activeSnippetString =
+    previewTab === 'json'
+      ? configJsonString
+      : previewTab === 'yaml'
+      ? cordisPatchYamlString
+      : cliCommandString;
 
   const handleDownloadConfig = () => {
     try {
@@ -67,7 +132,6 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const sanitizedName = plugin.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
       link.download = `${sanitizedName}-config.json`;
       document.body.appendChild(link);
       link.click();
@@ -90,7 +154,7 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
 
   const handleCopyConfig = async () => {
     try {
-      await navigator.clipboard.writeText(configJsonString);
+      await navigator.clipboard.writeText(activeSnippetString);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -125,7 +189,7 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
                 Configuration Exported Successfully
               </span>
               <span className="text-[10px] text-emerald-300/80 truncate font-mono">
-                {plugin.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}-config.json ready for DSH transfer
+                {sanitizedName}-config.json synced with deepseek-ai/deepseek-harness runtime
               </span>
             </div>
             <button
@@ -143,9 +207,14 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
         {/* Header */}
         <div className="p-6 border-b border-white/10 flex justify-between items-baseline bg-white/5">
           <div>
-            <span className="text-[10px] uppercase tracking-[0.3em] text-[#6366F1] font-bold block mb-1">
-              Plugin Inspection / {plugin.id}
-            </span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] uppercase tracking-[0.3em] text-[#6366F1] font-bold">
+                Plugin Inspection / {plugin.id}
+              </span>
+              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                DSH v4 Runtime Ready
+              </span>
+            </div>
             <h3 className="text-2xl font-black tracking-tight text-white">{plugin.name}</h3>
           </div>
           <div className="flex items-center gap-2">
@@ -161,6 +230,28 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
 
         {/* Content */}
         <div className="p-6 flex flex-col gap-5 font-mono text-sm overflow-y-auto">
+          {/* Upstream DeepSeek Harness Sync Banner */}
+          <div
+            id="upstream-harness-banner"
+            className="flex items-center justify-between px-3.5 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-xs"
+          >
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-[#6366F1]" />
+              <span className="text-white/60">Target Runtime:</span>
+              <span className="text-white font-bold font-mono">@deepseek-ai/dsh (Cordis v4)</span>
+            </div>
+            <a
+              id="upstream-repo-link"
+              href="https://github.com/deepseek-ai/deepseek-harness.git"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-[11px] text-[#A5B4FC] hover:text-white transition-colors underline-offset-2 hover:underline"
+            >
+              <span>deepseek-ai/deepseek-harness</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
           <div className="p-4 bg-white/[0.03] border border-white/5 rounded-xl">
             <span className="text-[10px] uppercase tracking-widest text-white/40 block mb-1">
               Governance Description
@@ -210,32 +301,63 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
             id="dsh-configuration-panel"
             className="p-4 bg-indigo-950/20 border border-[#6366F1]/30 rounded-xl flex flex-col gap-3"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-[#6366F1]" />
                 <span className="text-xs font-bold uppercase tracking-wider text-white">
-                  DSH Environment Configuration
+                  DSH Runtime Export Specification
                 </span>
               </div>
-              <button
-                id="toggle-config-preview-btn"
-                onClick={() => setShowConfigPreview(!showConfigPreview)}
-                className="flex items-center gap-1.5 text-[11px] text-[#A5B4FC] hover:text-white transition-colors cursor-pointer"
-              >
-                <Code className="w-3.5 h-3.5" />
-                <span>{showConfigPreview ? 'Hide JSON Preview' : 'Preview JSON'}</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <div className="flex bg-black/40 p-0.5 rounded-lg border border-white/10 text-[10px]">
+                  <button
+                    onClick={() => setPreviewTab('json')}
+                    className={`px-2 py-0.5 rounded transition-colors ${
+                      previewTab === 'json' ? 'bg-[#6366F1] text-white font-bold' : 'text-white/50 hover:text-white'
+                    }`}
+                  >
+                    JSON Manifest
+                  </button>
+                  <button
+                    onClick={() => setPreviewTab('yaml')}
+                    className={`px-2 py-0.5 rounded transition-colors ${
+                      previewTab === 'yaml' ? 'bg-[#6366F1] text-white font-bold' : 'text-white/50 hover:text-white'
+                    }`}
+                  >
+                    cordis.patch.yml
+                  </button>
+                  <button
+                    onClick={() => setPreviewTab('cli')}
+                    className={`px-2 py-0.5 rounded transition-colors ${
+                      previewTab === 'cli' ? 'bg-[#6366F1] text-white font-bold' : 'text-white/50 hover:text-white'
+                    }`}
+                  >
+                    CLI Flag
+                  </button>
+                </div>
+                <button
+                  id="toggle-config-preview-btn"
+                  onClick={() => setShowConfigPreview(!showConfigPreview)}
+                  className="flex items-center gap-1 text-[11px] text-[#A5B4FC] hover:text-white transition-colors cursor-pointer ml-1"
+                >
+                  <Code className="w-3.5 h-3.5" />
+                  <span>{showConfigPreview ? 'Hide' : 'Show'}</span>
+                </button>
+              </div>
             </div>
 
             <p className="text-xs text-white/60 font-sans">
-              Export this plugin&apos;s runtime variables, governance policy gates, and determinism constraints as a standardized JSON configuration for direct deployment across sovereign DSH instances.
+              Konfigurasi ini disinkronkan secara presisi dengan runtime spesifikasi{' '}
+              <strong className="text-white font-medium">deepseek-ai/deepseek-harness</strong>. Dapat langsung dimuat
+              oleh CLI <code className="text-[#A5B4FC]">dsh</code> atau di-patch ke dalam berkas{' '}
+              <code className="text-[#A5B4FC]">cordis.patch.yml</code>.
             </p>
 
-            {/* Optional JSON Preview */}
+            {/* Optional JSON / YAML / CLI Preview */}
             {showConfigPreview && (
               <div className="relative mt-2">
-                <pre className="p-3 bg-black/60 border border-white/10 rounded-lg text-[11px] text-emerald-400 overflow-x-auto max-h-48 font-mono leading-relaxed">
-                  {configJsonString}
+                <pre className="p-3 bg-black/60 border border-white/10 rounded-lg text-[11px] text-emerald-400 overflow-x-auto max-h-52 font-mono leading-relaxed whitespace-pre">
+                  {activeSnippetString}
                 </pre>
                 <button
                   id="copy-plugin-config-btn"
@@ -252,8 +374,8 @@ export function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
 
         {/* Footer with Download Configuration Button */}
         <div className="p-4 bg-white/[0.02] border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="text-[10px] uppercase tracking-widest text-white/40 flex items-center gap-3">
-            <span>Cordis v4 Sovereign Container</span>
+          <div className="text-[10px] uppercase tracking-widest text-white/40 flex items-center gap-2">
+            <span>deepseek-ai/deepseek-harness</span>
             <span className="w-1 h-1 rounded-full bg-white/20" />
             <span className="text-[#6366F1] font-bold">100% Deterministic</span>
           </div>

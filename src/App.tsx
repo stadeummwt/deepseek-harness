@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, ExternalLink } from 'lucide-react';
 import {
   CANONICAL_PLUGINS,
   MODEL_CANDIDATES,
@@ -132,9 +132,23 @@ export default function App() {
               DATA
             </span>
           </h1>
-          <span className="text-[11px] uppercase tracking-widest text-white/50 mt-2 font-mono">
-            DSH SUPREME // DEEPSEEK HARNESS MASTER DATA INTELLIGENCE RUNTIME
-          </span>
+          <div className="flex flex-wrap items-center gap-2.5 mt-2">
+            <span className="text-[11px] uppercase tracking-widest text-white/50 font-mono">
+              DSH SUPREME // DEEPSEEK HARNESS MASTER DATA INTELLIGENCE RUNTIME
+            </span>
+            <a
+              id="header-upstream-repo-link"
+              href="https://github.com/deepseek-ai/deepseek-harness.git"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono bg-white/5 hover:bg-white/10 text-[#A5B4FC] hover:text-white border border-white/10 transition-colors"
+              title="Official DeepSeek Harness Upstream Repository"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>deepseek-ai/deepseek-harness</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+            </a>
+          </div>
         </div>
         <div className="text-left sm:text-right">
           <div className="text-[10px] uppercase tracking-[0.2em] text-white/40 mb-1">Last Synced Data</div>
