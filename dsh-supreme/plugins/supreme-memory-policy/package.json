@@ -1,0 +1,11 @@
+{
+  "name": "@dsh-supreme/memory-policy",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Memory selection policy and context budgeting for DeepSeek Harness (without duplicating DSH session state)",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "cordis": "^4.0.0"
+  }
+}

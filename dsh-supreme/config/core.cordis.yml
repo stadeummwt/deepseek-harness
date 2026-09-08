@@ -1,0 +1,14 @@
+# DSH Supreme - Canonical Profile: core.cordis.yml
+# Profile: CORE
+# Purpose: Minimal production baseline for low-overhead, resource-constrained, or single-turn environments.
+# Guarantee: Deterministic policy gating with zero unnecessary I/O overhead.
+
+plugins:
+  # Root governance anchor - mandatory in all profiles
+  supreme-policy:
+    executionClass: CORE
+    allowPaid: false
+    allowTrial: false
+    allowUnknownCost: false
+    maxDelegationDepth: 1
+    requireVerificationForHighRisk: true

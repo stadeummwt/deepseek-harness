@@ -1,0 +1,12 @@
+{
+  "category": "subagent",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "task_id": "subagent-delegation-depth-01",
+      "description": "Spawn bounded subagent at depth 1 to review code diff and return validation token",
+      "risk_class": "MEDIUM",
+      "expected_output_type": "text"
+    }
+  ]
+}

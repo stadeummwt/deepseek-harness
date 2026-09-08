@@ -1,0 +1,11 @@
+{
+  "name": "@dsh-supreme/router",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Multi-factor weighted LLM model and provider routing engine with hard policy gates and circuit breakers for DeepSeek Harness",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "cordis": "^4.0.0"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "id": "fixture-dsh-001",
+  "project": "DSH Supreme",
+  "modules": [
+    "supreme-policy",
+    "supreme-observability",
+    "supreme-benchmark",
+    "supreme-router",
+    "supreme-verifier",
+    "supreme-memory-policy",
+    "supreme-workflow-policy"
+  ],
+  "checksum": "a7b3c2d1e4f5"
+}

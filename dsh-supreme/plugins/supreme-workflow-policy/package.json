@@ -1,0 +1,11 @@
+{
+  "name": "@dsh-supreme/workflow-policy",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Workflow governance, recursion depth limits, step budgets, and loop detection for DeepSeek Harness",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "cordis": "^4.0.0"
+  }
+}

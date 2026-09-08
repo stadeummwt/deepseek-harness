@@ -1,0 +1,7 @@
+{
+  "name": "DSH Supreme",
+  "description": "DeepSeek Harness Master Plugin Suite with Data Intelligence: automated cleaning and preprocessing pipeline, predictive Random Forest modeling with Shapley explanations, descriptive statistics, and trend visualizations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

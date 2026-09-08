@@ -1,0 +1,12 @@
+{
+  "category": "workflow",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "task_id": "workflow-pipeline-01",
+      "description": "Multi-step build, lint, and verify sequence with loop detection active",
+      "risk_class": "MEDIUM",
+      "expected_output_type": "json"
+    }
+  ]
+}

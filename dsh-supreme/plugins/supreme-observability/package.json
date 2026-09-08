@@ -1,0 +1,11 @@
+{
+  "name": "@dsh-supreme/observability",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Safe runtime operational event tracing with append-only JSONL storage and secret redaction for DeepSeek Harness",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "cordis": "^4.0.0"
+  }
+}

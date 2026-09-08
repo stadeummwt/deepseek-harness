@@ -1,0 +1,36 @@
+# DSH Supreme - Canonical Profile: standard.cordis.yml
+# Profile: STANDARD
+# Purpose: Recommended daily driver for production agent workflows.
+# Includes: Safe policy gating, operational telemetry, deterministic verification, memory selection, and subagent bounds.
+
+plugins:
+  # 1. Root governance anchor
+  supreme-policy:
+    executionClass: STANDARD
+    allowPaid: false
+    allowTrial: false
+    allowUnknownCost: false
+    maxDelegationDepth: 2
+    requireVerificationForHighRisk: true
+
+  # 2. Safe operational observability (append-only JSONL, secret-redacting)
+  supreme-observability:
+    enabled: true
+    logPath: dsh-supreme/data/observability/traces.jsonl
+    bufferFlushIntervalMs: 500
+
+  # 3. Deterministic output verification
+  supreme-verifier:
+    maxEvidenceLength: 500
+    timeoutMs: 5000
+
+  # 4. Memory selection policy and context budgeting (preserves DSH canonical sessions)
+  supreme-memory-policy:
+    defaultBudgetChars: 2000
+    enableProjectKnowledge: true
+
+  # 5. Workflow and subagent execution governance
+  supreme-workflow-policy:
+    defaultMaxDepth: 2
+    defaultMaxSteps: 25
+    loopThreshold: 3

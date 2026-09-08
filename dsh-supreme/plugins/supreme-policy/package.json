@@ -1,0 +1,11 @@
+{
+  "name": "@dsh-supreme/policy",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Centralized deterministic project policy, cost gating, and risk evaluation for DeepSeek Harness",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "cordis": "^4.0.0"
+  }
+}

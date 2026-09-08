@@ -1,0 +1,13 @@
+{
+  "category": "tool-calling",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "task_id": "tool-json-schema-01",
+      "description": "Invoke file_writer tool with valid JSON payload containing id, path, and content",
+      "risk_class": "MEDIUM",
+      "expected_output_type": "json",
+      "verifier_id": "default:json-parse"
+    }
+  ]
+}

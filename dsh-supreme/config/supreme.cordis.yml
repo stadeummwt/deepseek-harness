@@ -1,0 +1,53 @@
+# DSH Supreme - Canonical Profile: supreme.cordis.yml
+# Profile: SUPREME
+# Purpose: Complete production-grade setup with multi-factor routing, empirical benchmark evidence, verification, and memory.
+# Guarantee: Highest autonomous execution power while strictly upholding no-paid fallback and fail-open telemetry.
+
+plugins:
+  # 1. Root governance anchor
+  supreme-policy:
+    executionClass: SUPREME
+    allowPaid: false
+    allowTrial: false
+    allowUnknownCost: false
+    maxDelegationDepth: 3
+    requireVerificationForHighRisk: true
+
+  # 2. Operational telemetry and trace logging
+  supreme-observability:
+    enabled: true
+    logPath: dsh-supreme/data/observability/traces.jsonl
+    bufferFlushIntervalMs: 500
+
+  # 3. Empirical task benchmark storage and performance aggregation
+  supreme-benchmark:
+    storagePath: dsh-supreme/data/benchmark/benchmarks.jsonl
+    maxHistoricalSamples: 1000
+
+  # 4. Multi-factor LLM router with circuit breakers and normalized weights
+  supreme-router:
+    minHistoricalSamples: 5
+    weights:
+      historicalQuality: 0.30
+      health: 0.20
+      quotaHeadroom: 0.15
+      reliability: 0.10
+      latency: 0.10
+      capabilityFit: 0.10
+      failureDiversity: 0.05
+
+  # 5. Deterministic evidence verification
+  supreme-verifier:
+    maxEvidenceLength: 500
+    timeoutMs: 5000
+
+  # 6. Context-budgeted memory selection policy
+  supreme-memory-policy:
+    defaultBudgetChars: 3000
+    enableProjectKnowledge: true
+
+  # 7. Subagent depth bounds, step budgets, and cryptographic loop detection
+  supreme-workflow-policy:
+    defaultMaxDepth: 3
+    defaultMaxSteps: 30
+    loopThreshold: 3

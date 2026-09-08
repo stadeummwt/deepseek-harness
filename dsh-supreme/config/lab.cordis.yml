@@ -1,0 +1,56 @@
+# ==============================================================================
+# WARNING: NON-PRODUCTION / RESEARCH PROFILE ONLY
+# PROFILE: LAB (EXPERIMENTAL)
+# DO NOT DEPLOY THIS CONFIGURATION IN PRODUCTION WORKLOADS.
+# PAID MODELS, EXPERIMENTAL TRIAL ACCESS, AND RELAXED EXPLORATION ARE ENABLED
+# STRICTLY FOR OFFLINE BENCHMARKING AND CONTROLLED LABORATORY EVALUATION.
+# ==============================================================================
+
+plugins:
+  # 1. Root governance with explicit LAB overrides
+  supreme-policy:
+    executionClass: LAB
+    allowPaid: true
+    allowTrial: true
+    allowUnknownCost: false
+    maxDelegationDepth: 5
+    requireVerificationForHighRisk: true
+
+  # 2. Operational telemetry
+  supreme-observability:
+    enabled: true
+    logPath: dsh-supreme/data/observability/lab-traces.jsonl
+    bufferFlushIntervalMs: 250
+
+  # 3. High-capacity benchmark recording
+  supreme-benchmark:
+    storagePath: dsh-supreme/data/benchmark/benchmarks.jsonl
+    maxHistoricalSamples: 5000
+
+  # 4. Exploratory multi-factor routing
+  supreme-router:
+    minHistoricalSamples: 3
+    weights:
+      historicalQuality: 0.35
+      health: 0.15
+      quotaHeadroom: 0.10
+      reliability: 0.15
+      latency: 0.10
+      capabilityFit: 0.10
+      failureDiversity: 0.05
+
+  # 5. Deterministic verification
+  supreme-verifier:
+    maxEvidenceLength: 1000
+    timeoutMs: 10000
+
+  # 6. Expanded memory budgeting
+  supreme-memory-policy:
+    defaultBudgetChars: 5000
+    enableProjectKnowledge: true
+
+  # 7. Extended workflow limits
+  supreme-workflow-policy:
+    defaultMaxDepth: 5
+    defaultMaxSteps: 50
+    loopThreshold: 4

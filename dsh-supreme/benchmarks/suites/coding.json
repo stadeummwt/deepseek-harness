@@ -1,0 +1,19 @@
+{
+  "category": "coding",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "task_id": "coding-ts-fibonacci-01",
+      "description": "Write a pure, memoized recursive fibonacci generator in TypeScript",
+      "risk_class": "LOW",
+      "expected_output_type": "typescript",
+      "verifier_id": "default:json-parse"
+    },
+    {
+      "task_id": "coding-cordis-plugin-02",
+      "description": "Construct a minimal Cordis Service class with lifecycle disposal hook",
+      "risk_class": "LOW",
+      "expected_output_type": "typescript"
+    }
+  ]
+}

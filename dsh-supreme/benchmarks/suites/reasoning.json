@@ -1,0 +1,19 @@
+{
+  "category": "reasoning",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "task_id": "reasoning-deduction-01",
+      "description": "Multi-step propositional deduction and contradiction elimination",
+      "risk_class": "LOW",
+      "expected_output_type": "text",
+      "verifier_id": "default:exact-text"
+    },
+    {
+      "task_id": "reasoning-math-proof-02",
+      "description": "Inductive proof verification for sum of first n squares",
+      "risk_class": "LOW",
+      "expected_output_type": "text"
+    }
+  ]
+}

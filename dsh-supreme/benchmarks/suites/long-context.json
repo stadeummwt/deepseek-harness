@@ -1,0 +1,12 @@
+{
+  "category": "long-context",
+  "version": "1.0.0",
+  "tasks": [
+    {
+      "task_id": "long-context-needle-01",
+      "description": "Locate needle fact in 32k token document context without loss of accuracy",
+      "risk_class": "LOW",
+      "expected_output_type": "text"
+    }
+  ]
+}
